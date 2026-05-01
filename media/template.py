@@ -191,11 +191,11 @@ def build_image_post(input_path, output_path, topic, hook=""):
     draw.text((W-MARGIN-_tw(draw,spec,sf), 86), spec, font=sf, fill=(*LIGHT_BLUE,215))
 
     # ── Başlık + Hook ─────────────────────────────────────────────────────────
-    title_f = _font(60, bold=True)
+    title_f = _font(50, bold=True)
     hook_f  = _font(42)
 
     t_lines  = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
-    LINE_H   = 70
+    LINE_H   = 58
     h_lines  = textwrap.fill(hook, width=38).split("\n")[:2] if hook else []
     HOOK_H   = 56
     SAFE_GAP = 95
@@ -209,9 +209,25 @@ def build_image_post(input_path, output_path, topic, hook=""):
 
     if h_lines:
         hy = title_y + len(t_lines)*LINE_H + 16
+        # Hook bloğunun toplam yüksekliğini hesapla
+        hook_block_h = len(h_lines) * HOOK_H
+        max_hw = max(_tw(draw, hl, hook_f) for hl in h_lines)
+        pad_x, pad_y = 28, 14
+        rect_x = (W - max_hw) // 2 - pad_x
+        rect_y = hy - pad_y
+        rect_x2 = rect_x + max_hw + pad_x * 2
+        rect_y2 = hy + hook_block_h + pad_y
+        # %30 transparan beyaz dikdörtgen
+        hook_bg = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(hook_bg).rounded_rectangle(
+            [rect_x, rect_y, rect_x2, rect_y2],
+            radius=10, fill=(255, 255, 255, 77)  # 77 = %30 opacity
+        )
+        canvas = Image.alpha_composite(canvas, hook_bg)
+        draw = ImageDraw.Draw(canvas)
         for j, hl in enumerate(h_lines):
-            draw.text((_cx(draw,hl,hook_f), hy+j*HOOK_H),
-                      hl, font=hook_f, fill=(*LIGHT_BLUE,240))
+            draw.text((_cx(draw, hl, hook_f), hy + j * HOOK_H),
+                      hl, font=hook_f, fill=(0, 0, 0, 255))  # siyah
 
     # ── FOOTER — 3 satır, üst üste gelmiyor ──────────────────────────────────
     fy  = IMG_BOT + 18
@@ -291,10 +307,10 @@ def build_story_post(input_path, output_path, topic, hook=""):
     draw.text((next_x, 40), DOCTOR_NAME, font=_font(32), fill=(*WHITE,240))
 
     # Başlık + Hook
-    tf      = _font(60, bold=True)
+    tf      = _font(50, bold=True)
     hkf     = _font(42)
     t_lines = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
-    LINE_H  = 70
+    LINE_H  = 58
     h_lines = textwrap.fill(hook, width=36).split("\n")[:2] if hook else []
     HOOK_H  = 58
 
@@ -306,8 +322,23 @@ def build_story_post(input_path, output_path, topic, hook=""):
 
     if h_lines:
         hy = ty + len(t_lines)*LINE_H + 14
+        hook_block_h = len(h_lines) * HOOK_H
+        max_hw = max(_tw(draw, hl, hkf) for hl in h_lines)
+        pad_x, pad_y = 28, 14
+        rect_x  = (W - max_hw) // 2 - pad_x
+        rect_y  = hy - pad_y
+        rect_x2 = rect_x + max_hw + pad_x * 2
+        rect_y2 = hy + hook_block_h + pad_y
+        hook_bg = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        ImageDraw.Draw(hook_bg).rounded_rectangle(
+            [rect_x, rect_y, rect_x2, rect_y2],
+            radius=10, fill=(255, 255, 255, 77)
+        )
+        canvas = Image.alpha_composite(canvas, hook_bg)
+        draw = ImageDraw.Draw(canvas)
         for j, hl in enumerate(h_lines):
-            draw.text((_cx(draw,hl,hkf), hy+j*HOOK_H), hl, font=hkf, fill=(*LIGHT_BLUE,240))
+            draw.text((_cx(draw, hl, hkf), hy + j * HOOK_H),
+                      hl, font=hkf, fill=(0, 0, 0, 255))
 
     wf = _font(32)
     wt = f"🌐  {WEBSITE}"
