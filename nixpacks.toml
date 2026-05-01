@@ -6,6 +6,5 @@ aptPkgs = [
   "fontconfig",
   "libcairo2",
   "libcairo2-dev",
-  "python3-gi",
-  "libgirepository1.0-dev"
+  "ffmpeg"
 ]
