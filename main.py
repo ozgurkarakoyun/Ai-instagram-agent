@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -23,6 +23,7 @@ from ai.caption import generate_caption
 from ai.hashtags import generate_hashtags
 from ai.script import generate_script
 from ai.hook import generate_hook
+from ai.translate import normalize_topic
 from media.template import build_image_post, build_story_post
 from media.video import build_reel_preview
 from media.utils import validate_file, save_upload
@@ -72,6 +73,9 @@ async def request_id_middleware(request: Request, call_next):
 
 @app.get("/")
 async def root():
+    ui_path = Path("static/index.html")
+    if ui_path.exists():
+        return HTMLResponse(content=ui_path.read_text(encoding="utf-8"))
     return {
         "status": "running",
         "version": "2.0.0",
@@ -97,6 +101,11 @@ async def create_post(
 ):
     rid = getattr(request.state, "request_id", uuid.uuid4().hex[:8])
     logger.info(f"[{rid}] topic={topic!r} type={content_type} tone={tone}")
+
+    # Topic normalizasyonu (Türkçe → İngilizce)
+    topic, was_translated = normalize_topic(topic)
+    if was_translated:
+        logger.info(f"[{rid}] Topic normalized → {topic!r}")
 
     try:
         validate_file(file, content_type)
@@ -147,6 +156,7 @@ async def create_post(
     return JSONResponse(content={
         "job_id": rid,
         "topic": topic,
+        "topic_normalized": was_translated,
         # ── AI content ────────────────────────────────────────────────────────
         "hook": hook,
         "generated_caption": caption,
