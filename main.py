@@ -144,9 +144,12 @@ async def create_post(
         else:
             reel_path   = f"output/reel_{rid}.mp4"
             reel_result = build_reel_preview(str(upload_path), reel_path, topic, hook, script or "")
-            actual_path = reel_result.get("path", reel_path)
+            actual_path    = reel_result.get("path", reel_path)
+            is_fallback    = reel_result.get("fallback", False)
             outputs["reel"]          = f"/{actual_path}"
-            outputs["reel_fallback"] = reel_result.get("fallback", False)
+            outputs["reel_fallback"] = is_fallback
+            if is_fallback:
+                logger.warning(f"[{rid}] ffmpeg/MoviePy yok — fallback JPEG")
     except Exception as exc:
         logger.error(f"[{rid}] Media error: {exc}")
         raise HTTPException(status_code=500, detail=f"Media processing failed: {exc}")
