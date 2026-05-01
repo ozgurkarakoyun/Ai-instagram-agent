@@ -1,38 +1,44 @@
 """
-media/template.py  ·  v3
-Production Image Template Engine
-Font boyutları büyütüldü, Railway font uyumlu, fallback güçlü.
+media/template.py  ·  v7
+CVS Health Hub Palette + Gradient
 
-Grid:
-  Canvas : 1080 x 1920
-  Header : 0   → 260  (h=260)
-  Image  : 260 → 1680 (h=1420)
-  Footer : 1680→ 1920 (h=240)
+  LIGHT_BLUE  #44B4E7  — açık mavi (hook, aksan, link)
+  NAVY        #17447C  — lacivert (gradient sol, header)
+  RED         #E11E3B  — kırmızı (çizgiler, pill, vurgu)
+  WHITE       #FFFFFF  — ana metin
+  DARK        #0A1A30  — gradient sağ (navy'den koyu)
+
+Gradient stratejisi:
+  Canvas BG  : Lacivert (#17447C) sol → Koyu (#0A1A30) sağ
+  Accent hat : Kırmızı (#E11E3B) sol → Açık Mavi (#44B4E7) sağ
+  Overlay    : şeffaf lacivert tint
 """
 
-import logging
-import textwrap
+import logging, textwrap, glob
 from pathlib import Path
-
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from media.logo import load_logo
 
 logger = logging.getLogger(__name__)
 
-W, H       = 1080, 1920
-MARGIN     = 60
-HEADER_H   = 260
-FOOTER_H   = 240
-IMG_TOP    = HEADER_H
-IMG_H      = H - HEADER_H - FOOTER_H
-IMG_BOT    = IMG_TOP + IMG_H
+W, H      = 1080, 1920
+MARGIN    = 64
+HEADER_H  = 280
+FOOTER_H  = 300
+IMG_TOP   = HEADER_H
+IMG_H     = H - HEADER_H - FOOTER_H
+IMG_BOT   = IMG_TOP + IMG_H
 
-BG         = (10, 14, 26)
-TEAL       = (0, 201, 200)
-WHITE      = (255, 255, 255)
-SUBTEXT    = (160, 190, 190)
-FOOTER_BG  = (0, 0, 0, 210)
-HEADER_BG  = (0, 40, 50, 40)
+# ── Palette ───────────────────────────────────────────────────────────────────
+LIGHT_BLUE = (68,  180, 231)   # #44B4E7
+NAVY       = (23,   68, 124)   # #17447C
+RED        = (225,  30,  59)   # #E11E3B
+WHITE      = (255, 255, 255)   # #FFFFFF
+DARK       = (10,   26,  48)   # #0A1A30  (gradient sonu)
+SUBTEXT    = (160, 200, 230)   # açık mavi-gri
+
+FOOTER_BG  = (8, 18, 36, 228)
+HEADER_BG  = (23, 68, 124, 40)
 
 DOCTOR_NAME = "Assoc. Prof. Dr. Özgür Karakoyun"
 PHONE       = "+90 545 919 54 13"
@@ -40,284 +46,276 @@ WEBSITE     = "www.ozgurkarakoyun.com"
 EMAIL       = "info@ozgurkarakoyun.com"
 
 
-# ── Font loader ───────────────────────────────────────────────────────────────
-
-FONT_PATHS_BOLD = [
-    "static/fonts/Bold.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    "/usr/share/fonts/truetype/crosextra/Carlito-Bold.ttf",
-]
-
-FONT_PATHS_REGULAR = [
-    "static/fonts/Regular.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-    "/usr/share/fonts/truetype/crosextra/Carlito-Regular.ttf",
-]
-
-_font_cache: dict = {}
-
-def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+# ── Font ──────────────────────────────────────────────────────────────────────
+_cache: dict = {}
+def _font(size, bold=False):
     key = (size, bold)
-    if key in _font_cache:
-        return _font_cache[key]
-    paths = FONT_PATHS_BOLD if bold else FONT_PATHS_REGULAR
+    if key in _cache: return _cache[key]
+    paths = (["static/fonts/Bold.ttf",
+               "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+               "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
+              if bold else
+              ["static/fonts/Regular.ttf",
+               "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+               "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"])
+    paths += glob.glob("/usr/share/fonts/**/*.ttf", recursive=True)
     for p in paths:
         try:
             f = ImageFont.truetype(p, size)
-            _font_cache[key] = f
-            return f
-        except Exception:
-            continue
-    # Hard fallback: try any .ttf on the system
-    import glob
-    for p in glob.glob("/usr/share/fonts/**/*.ttf", recursive=True):
-        try:
-            f = ImageFont.truetype(p, size)
-            logger.warning(f"Using fallback font: {p}")
-            _font_cache[key] = f
-            return f
-        except Exception:
-            continue
-    logger.error("NO TTF FONT FOUND — text will be invisible. Install fonts-dejavu-core.")
+            _cache[key] = f; return f
+        except Exception: continue
     return ImageFont.load_default()
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
+# ── Yardımcılar ───────────────────────────────────────────────────────────────
 def _tw(draw, text, font):
-    bb = draw.textbbox((0, 0), text, font=font)
+    bb = draw.textbbox((0,0), text, font=font)
     return bb[2] - bb[0]
 
-def _th(draw, text, font):
-    bb = draw.textbbox((0, 0), text, font=font)
-    return bb[3] - bb[1]
-
 def _cx(draw, text, font):
-    """X position to centre text on canvas."""
-    return (W - _tw(draw, text, font)) // 2
+    return max(0, (W - _tw(draw, text, font)) // 2)
 
 def _semi(canvas, x0, y0, x1, y1, color):
-    layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    rect  = Image.new("RGBA", (x1 - x0, y1 - y0), color)
-    layer.paste(rect, (x0, y0))
+    layer = Image.new("RGBA", (W,H), (0,0,0,0))
+    layer.paste(Image.new("RGBA", (x1-x0,y1-y0), color), (x0,y0))
     return Image.alpha_composite(canvas, layer)
 
-def _grad(canvas, y0, y1, c0, c1):
+def _vgrad(canvas, y0, y1, c0, c1):
+    """Dikey gradient şerit."""
     draw = ImageDraw.Draw(canvas)
-    span = max(1, y1 - y0)
+    span = max(1, y1-y0)
     for i in range(span):
-        t = i / span
-        r = int(c0[0] + (c1[0]-c0[0])*t)
-        g = int(c0[1] + (c1[1]-c0[1])*t)
-        b = int(c0[2] + (c1[2]-c0[2])*t)
-        a = int(c0[3] + (c1[3]-c0[3])*t)
-        draw.line([(0, y0+i), (W, y0+i)], fill=(r, g, b, a))
+        t = i/span
+        rgba = tuple(int(c0[j]+(c1[j]-c0[j])*t) for j in range(4))
+        draw.line([(0,y0+i),(W,y0+i)], fill=rgba)
+
+def _hgrad_canvas(canvas, c_left, c_right):
+    """Yatay gradient — tüm canvas sol→sağ."""
+    draw = ImageDraw.Draw(canvas)
+    for xi in range(W):
+        t = xi/W
+        r = int(c_left[0]+(c_right[0]-c_left[0])*t)
+        g = int(c_left[1]+(c_right[1]-c_left[1])*t)
+        b = int(c_left[2]+(c_right[2]-c_left[2])*t)
+        draw.line([(xi,0),(xi,H)], fill=(r,g,b,255))
+
+def _accent_line(draw, y, thickness=5):
+    """Kırmızı → Açık Mavi gradient accent çizgisi."""
+    for xi in range(W):
+        t = xi/W
+        r = int(RED[0]+(LIGHT_BLUE[0]-RED[0])*t)
+        g = int(RED[1]+(LIGHT_BLUE[1]-RED[1])*t)
+        b = int(RED[2]+(LIGHT_BLUE[2]-RED[2])*t)
+        draw.line([(xi,y),(xi,y+thickness)], fill=(r,g,b,255))
 
 def _fit_into(img, bw, bh):
     img = img.convert("RGBA")
     sw, sh = img.size
-    # Blurred fill background
-    bg = img.resize((bw, bh), Image.LANCZOS)
-    bg = bg.filter(ImageFilter.GaussianBlur(28))
-    bg = ImageEnhance.Brightness(bg.convert("RGB")).enhance(0.3).convert("RGBA")
-    bg = Image.alpha_composite(bg, Image.new("RGBA", (bw, bh), (0,0,0,80)))
-    # Scaled foreground
-    scale = min(bw / sw, bh / sh) * 0.92
-    nw, nh = max(1, int(sw*scale)), max(1, int(sh*scale))
-    fg = img.resize((nw, nh), Image.LANCZOS)
-    bg.paste(fg, ((bw-nw)//2, (bh-nh)//2), fg)
+    bg = img.resize((bw,bh), Image.LANCZOS)
+    bg = bg.filter(ImageFilter.GaussianBlur(30))
+    bg = ImageEnhance.Brightness(bg.convert("RGB")).enhance(0.22).convert("RGBA")
+    bg = Image.alpha_composite(bg, Image.new("RGBA",(bw,bh),(0,0,0,100)))
+    scale = min(bw/sw, bh/sh)*0.88
+    nw, nh = max(1,int(sw*scale)), max(1,int(sh*scale))
+    fg = img.resize((nw,nh), Image.LANCZOS)
+    bg.paste(fg, ((bw-nw)//2,(bh-nh)//2), fg)
     return bg
 
+def _logo_or_pill(canvas, draw, x, y, pill_h=108, logo_h=96):
+    logo = load_logo(target_h=logo_h)
+    if logo is not None:
+        canvas.paste(logo, (x,y), logo)
+        return x + logo.width + 20
+    lf = _font(int(pill_h*0.40), bold=True)
+    lw = _tw(draw, "OK", lf)
+    # Kırmızı pill, beyaz yazı
+    draw.rounded_rectangle([x-10,y-6,x+lw+18,y+pill_h-12],
+                            radius=12, fill=(*RED,255))
+    draw.text((x+4, y+4), "OK", font=lf, fill=(*WHITE,255))
+    return x + lw + 32
 
-# ── POST builder ──────────────────────────────────────────────────────────────
 
+# ══════════════════════════════════════════════════════════════════════════════
+# POST
+# ══════════════════════════════════════════════════════════════════════════════
 def build_image_post(input_path, output_path, topic, hook=""):
-    canvas = Image.new("RGBA", (W, H), (*BG, 255))
+    canvas = Image.new("RGBA", (W,H), (*NAVY,255))
 
-    # Subtle arc decoration
-    arc = Image.new("RGBA", (W, H), (0,0,0,0))
-    ImageDraw.Draw(arc).ellipse([-200,-200,440,440], outline=(*TEAL,22), width=70)
-    canvas = Image.alpha_composite(canvas, arc)
+    # ── Arka plan: Lacivert sol → Koyu sağ ───────────────────────────────────
+    _hgrad_canvas(canvas, NAVY, DARK)
 
-    # Header tint
+    # ── Dekoratif elementler ──────────────────────────────────────────────────
+    dec = Image.new("RGBA", (W,H), (0,0,0,0))
+    d2  = ImageDraw.Draw(dec)
+    # Sol üst büyük arc — açık mavi
+    d2.ellipse([-260,-260,440,440], outline=(*LIGHT_BLUE,18), width=100)
+    # Sağ alt küçük arc — kırmızı
+    d2.ellipse([W-200,H-200,W+400,H+400], outline=(*RED,14), width=60)
+    # Sol kenar ince şerit — lacivert/mavi
+    d2.rectangle([0,0,6,H], fill=(*LIGHT_BLUE,60))
+    canvas = Image.alpha_composite(canvas, dec)
+
+    # Header lacivert tint
     canvas = _semi(canvas, 0, 0, W, HEADER_H, HEADER_BG)
     draw = ImageDraw.Draw(canvas)
-    # Header bottom accent line
-    draw.rectangle([0, HEADER_H-5, W, HEADER_H], fill=(*TEAL, 255))
 
-    # ── User image ────────────────────────────────────────────────────────────
+    # Header alt accent çizgisi: Kırmızı → Açık Mavi
+    _accent_line(draw, HEADER_H-5, thickness=5)
+
+    # ── Kullanıcı görseli ─────────────────────────────────────────────────────
     try:
         user_img = Image.open(input_path).convert("RGBA")
         fitted   = _fit_into(user_img, W, IMG_H)
-        canvas.paste(fitted, (0, IMG_TOP), fitted)
+        canvas.paste(fitted, (0,IMG_TOP), fitted)
     except Exception as exc:
-        logger.error(f"Image load failed: {exc}")
-        ph = Image.new("RGBA", (W, IMG_H), (20, 32, 48, 255))
-        canvas.paste(ph, (0, IMG_TOP))
+        logger.error(f"Görsel: {exc}")
+        canvas.paste(Image.new("RGBA",(W,IMG_H),(10,20,40,255)), (0,IMG_TOP))
 
-    # Gradients
-    _grad(canvas, IMG_TOP, IMG_TOP+200, (10,14,26,200), (0,0,0,0))
-    _grad(canvas, IMG_BOT-240, IMG_BOT,  (0,0,0,0), (0,0,0,220))
+    # Üst ve alt fade — lacivert/koyu tonlara
+    _vgrad(canvas, IMG_TOP,       IMG_TOP+260, (23,68,124,210),  (0,0,0,0))
+    _vgrad(canvas, IMG_BOT-320,   IMG_BOT,     (0,0,0,0),        (10,26,48,240))
 
     # Footer overlay
     canvas = _semi(canvas, 0, IMG_BOT, W, H, FOOTER_BG)
     draw = ImageDraw.Draw(canvas)
-    draw.rectangle([0, IMG_BOT, W, IMG_BOT+4], fill=(*TEAL,255))
 
-    # ── HEADER content ────────────────────────────────────────────────────────
-    # Logo veya OK pill
-    logo = load_logo(target_h=110)
-    lx, ly = MARGIN, 30
-    if logo is not None:
-        # Logo paste (RGBA transparan destekli)
-        canvas.paste(logo, (lx, ly), logo)
-        logo_end_x = lx + logo.width + 16
-    else:
-        # Fallback: OK pill
-        lf = _font(46, bold=True)
-        lw = _tw(draw, "OK", lf)
-        draw.rounded_rectangle([lx-10, ly-6, lx+lw+16, ly+56], radius=12, fill=(*TEAL,255))
-        draw.text((lx+4, ly), "OK", font=lf, fill=(*BG,255))
-        logo_end_x = lx + lw + 32
+    # Footer üst accent çizgisi: Kırmızı → Açık Mavi
+    _accent_line(draw, IMG_BOT, thickness=5)
 
-    draw = ImageDraw.Draw(canvas)  # re-acquire after paste
+    # ── HEADER İçeriği ────────────────────────────────────────────────────────
+    next_x = _logo_or_pill(canvas, draw, MARGIN, 34, pill_h=108, logo_h=96)
+    draw = ImageDraw.Draw(canvas)
 
-    # Doctor name — right side of header
-    nf = _font(30)
+    nf = _font(36)
     nw = _tw(draw, DOCTOR_NAME, nf)
-    draw.text((W-MARGIN-nw, 34), DOCTOR_NAME, font=nf, fill=(*WHITE,240))
+    draw.text((W-MARGIN-nw, 36), DOCTOR_NAME, font=nf, fill=(*WHITE,248))
 
-    # Specialty
-    sf = _font(26)
+    sf = _font(28)
     spec = "Orthopedics & Traumatology"
-    spw = _tw(draw, spec, sf)
-    draw.text((W-MARGIN-spw, 76), spec, font=sf, fill=(*TEAL,210))
+    draw.text((W-MARGIN-_tw(draw,spec,sf), 86), spec, font=sf, fill=(*LIGHT_BLUE,215))
 
-    # ── Topic title (lower third, above footer) ───────────────────────────────
-    title_font = _font(88, bold=True)
-    hook_font  = _font(40)
+    # ── Başlık + Hook ─────────────────────────────────────────────────────────
+    title_f = _font(130, bold=True)
+    hook_f  = _font(48)
 
-    topic_up  = topic.upper()
-    wrapped   = textwrap.fill(topic_up, width=16).split("\n")
-    line_h    = 96
-    block_h   = len(wrapped) * line_h + (44 if hook else 0)
-    title_y   = IMG_BOT - 48 - block_h
+    t_lines  = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
+    LINE_H   = 142
+    h_lines  = textwrap.fill(hook, width=38).split("\n")[:2] if hook else []
+    HOOK_H   = 56
+    SAFE_GAP = 95
 
-    for i, line in enumerate(wrapped[:3]):
-        lx2 = _cx(draw, line, title_font)
-        draw.text((lx2, title_y + i*line_h), line, font=title_font, fill=(*WHITE,255))
+    block_h = len(t_lines)*LINE_H + (len(h_lines)*HOOK_H+20 if h_lines else 0)
+    title_y = max(IMG_TOP+60, IMG_BOT - SAFE_GAP - block_h)
 
-    if hook:
-        hy = title_y + len(wrapped)*line_h + 10
-        hook_short = textwrap.fill(hook, width=42)
-        for j, hl in enumerate(hook_short.split("\n")[:2]):
-            hx = _cx(draw, hl, hook_font)
-            draw.text((hx, hy + j*48), hl, font=hook_font, fill=(*TEAL,230))
+    for i, line in enumerate(t_lines):
+        draw.text((_cx(draw,line,title_f), title_y+i*LINE_H),
+                  line, font=title_f, fill=(*WHITE,255))
 
-    # ── FOOTER content ────────────────────────────────────────────────────────
-    fy     = IMG_BOT + 22
-    fnf    = _font(38, bold=True)
-    fdf    = _font(30)
-    fdisf  = _font(24)
+    if h_lines:
+        hy = title_y + len(t_lines)*LINE_H + 16
+        for j, hl in enumerate(h_lines):
+            draw.text((_cx(draw,hl,hook_f), hy+j*HOOK_H),
+                      hl, font=hook_f, fill=(*LIGHT_BLUE,240))
 
-    # Left: name + website
-    draw.text((MARGIN, fy),    DOCTOR_NAME,       font=fnf, fill=(*WHITE,255))
-    draw.text((MARGIN, fy+52), f"🌐 {WEBSITE}",  font=fdf, fill=(*TEAL,235))
+    # ── FOOTER — 3 satır, üst üste gelmiyor ──────────────────────────────────
+    fy  = IMG_BOT + 18
+    fnf = _font(42, bold=True)
+    fdf = _font(30)
+    disf= _font(24)
 
-    # Right: phone + email
-    col2 = W//2 + 20
-    draw.text((col2, fy),    f"📞 {PHONE}",  font=fdf, fill=(*WHITE,240))
-    draw.text((col2, fy+48), f"✉  {EMAIL}",  font=fdf, fill=(*SUBTEXT,210))
+    # Satır 1: İsim ortada
+    draw.text(((W-_tw(draw,DOCTOR_NAME,fnf))//2, fy),
+              DOCTOR_NAME, font=fnf, fill=(*WHITE,255))
+
+    # İnce açık mavi ayraç çizgisi
+    fy_line = fy + 54
+    draw.rectangle([MARGIN, fy_line, W-MARGIN, fy_line+1],
+                   fill=(*LIGHT_BLUE, 70))
+
+    # Satır 2: Tel sol | Web sağ
+    fy2 = fy_line + 14
+    draw.text((MARGIN, fy2), f"📞  {PHONE}", font=fdf, fill=(*WHITE,235))
+    web_t = f"🌐  {WEBSITE}"
+    draw.text((W-MARGIN-_tw(draw,web_t,fdf), fy2),
+              web_t, font=fdf, fill=(*LIGHT_BLUE,235))
+
+    # Satır 3: Email ortada
+    fy3 = fy2 + 48
+    em_t = f"✉   {EMAIL}"
+    draw.text(((W-_tw(draw,em_t,fdf))//2, fy3),
+              em_t, font=fdf, fill=(*SUBTEXT,210))
 
     # Disclaimer
-    dis  = "⚕  Medical information only. Consult your doctor."
-    disw = _tw(draw, dis, fdisf)
-    draw.text(((W-disw)//2, H-36), dis, font=fdisf, fill=(130,155,155,185))
+    dis = "⚕  Medical information only. Consult your doctor."
+    draw.text(((W-_tw(draw,dis,disf))//2, H-32),
+              dis, font=disf, fill=(100,140,180,185))
 
-    # Save
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    final = canvas.convert("RGB")
-    assert final.size == (W, H)
-    final.save(str(out), "JPEG", quality=93, optimize=True)
+    canvas.convert("RGB").save(str(out), "JPEG", quality=94, optimize=True)
     logger.info(f"Post {W}x{H} → {output_path}")
 
 
-# ── STORY builder ─────────────────────────────────────────────────────────────
-
+# ══════════════════════════════════════════════════════════════════════════════
+# STORY
+# ══════════════════════════════════════════════════════════════════════════════
 def build_story_post(input_path, output_path, topic, hook=""):
-    canvas = Image.new("RGBA", (W, H), (*BG, 255))
+    canvas = Image.new("RGBA", (W,H), (*NAVY,255))
+    _hgrad_canvas(canvas, NAVY, DARK)
 
-    # Full-bleed user image
+    # Full-bleed görsel
     try:
         user_img = Image.open(input_path).convert("RGBA")
         sw, sh = user_img.size
         scale  = max(W/sw, H/sh)
-        nw, nh = int(sw*scale), int(sh*scale)
-        filled = user_img.resize((nw, nh), Image.LANCZOS)
-        x_off  = (W-nw)//2
-        y_off  = (H-nh)//2
-        canvas.paste(filled, (x_off, y_off), filled)
+        nw, nh = max(1,int(sw*scale)), max(1,int(sh*scale))
+        filled = user_img.resize((nw,nh), Image.LANCZOS)
+        canvas.paste(filled, ((W-nw)//2,(H-nh)//2), filled)
     except Exception as exc:
-        logger.warning(f"Story image load failed: {exc}")
+        logger.warning(f"Story görsel: {exc}")
 
-    # Top + bottom gradients
-    _grad(canvas, 0,   320, (0,0,0,220), (0,0,0,0))
-    _grad(canvas, H-380, H, (0,0,0,0),   (0,0,0,230))
+    # Gradientler — lacivert tonlara
+    _vgrad(canvas, 0,     380, (23,68,124,240), (0,0,0,0))
+    _vgrad(canvas, H-480, H,   (0,0,0,0),       (10,26,48,248))
+
+    # Sol/sağ kenar şeritler
+    dec = Image.new("RGBA",(W,H),(0,0,0,0))
+    ImageDraw.Draw(dec).rectangle([0,0,6,H], fill=(*RED,180))
+    ImageDraw.Draw(dec).rectangle([W-6,0,W,H], fill=(*LIGHT_BLUE,120))
+    canvas = Image.alpha_composite(canvas, dec)
 
     draw = ImageDraw.Draw(canvas)
+    _accent_line(draw, 155, thickness=4)
 
-    # Top: logo veya OK pill + name
-    logo = load_logo(target_h=90)
-    lx2, ly2 = MARGIN, 28
-    if logo is not None:
-        canvas.paste(logo, (lx2, ly2), logo)
-        name_x = lx2 + logo.width + 20
-        draw = ImageDraw.Draw(canvas)
-    else:
-        lf = _font(40, bold=True)
-        lw = _tw(draw, "OK", lf)
-        draw.rounded_rectangle([lx2-10, ly2, lx2+lw+16, ly2+68], radius=12, fill=(*TEAL,255))
-        draw.text((lx2+4, ly2+2), "OK", font=lf, fill=(*BG,255))
-        name_x = lx2 + lw + 36
+    # Logo / pill + isim
+    next_x = _logo_or_pill(canvas, draw, MARGIN, 28, pill_h=96, logo_h=86)
+    draw = ImageDraw.Draw(canvas)
+    draw.text((next_x, 40), DOCTOR_NAME, font=_font(32), fill=(*WHITE,240))
 
-    nf = _font(30)
-    draw.text((name_x, 40), DOCTOR_NAME, font=nf, fill=(*WHITE,240))
+    # Başlık + Hook
+    tf      = _font(130, bold=True)
+    hkf     = _font(50)
+    t_lines = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
+    LINE_H  = 142
+    h_lines = textwrap.fill(hook, width=36).split("\n")[:2] if hook else []
+    HOOK_H  = 58
 
-    # Topic + hook bottom
-    tf  = _font(86, bold=True)
-    hkf = _font(40)
+    block_h = len(t_lines)*LINE_H + (len(h_lines)*HOOK_H+18 if h_lines else 0)
+    ty = H - 180 - block_h
 
-    topic_up = topic.upper()
-    wrapped  = textwrap.fill(topic_up, width=16).split("\n")
-    line_h   = 96
-    block_h  = len(wrapped)*line_h + (54 if hook else 0)
-    ty       = H - 160 - block_h
+    for i, line in enumerate(t_lines):
+        draw.text((_cx(draw,line,tf), ty+i*LINE_H), line, font=tf, fill=(*WHITE,255))
 
-    for i, line in enumerate(wrapped[:3]):
-        lx = _cx(draw, line, tf)
-        draw.text((lx, ty + i*line_h), line, font=tf, fill=(*WHITE,255))
+    if h_lines:
+        hy = ty + len(t_lines)*LINE_H + 14
+        for j, hl in enumerate(h_lines):
+            draw.text((_cx(draw,hl,hkf), hy+j*HOOK_H), hl, font=hkf, fill=(*LIGHT_BLUE,240))
 
-    if hook:
-        hy = ty + len(wrapped)*line_h + 12
-        hook_short = textwrap.fill(hook, width=38)
-        for j, hl in enumerate(hook_short.split("\n")[:2]):
-            hx = _cx(draw, hl, hkf)
-            draw.text((hx, hy + j*50), hl, font=hkf, fill=(*TEAL,230))
-
-    # Website bottom
-    wf  = _font(30)
-    wt  = f"🌐 {WEBSITE}"
-    wwt = _tw(draw, wt, wf)
-    draw.text(((W-wwt)//2, H-60), wt, font=wf, fill=(*TEAL,230))
+    wf = _font(32)
+    wt = f"🌐  {WEBSITE}"
+    draw.text(((W-_tw(draw,wt,wf))//2, H-52), wt, font=wf, fill=(*LIGHT_BLUE,230))
 
     out = Path(output_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    final = canvas.convert("RGB")
-    assert final.size == (W, H)
-    final.save(str(out), "JPEG", quality=93, optimize=True)
+    canvas.convert("RGB").save(str(out), "JPEG", quality=94, optimize=True)
     logger.info(f"Story {W}x{H} → {output_path}")
