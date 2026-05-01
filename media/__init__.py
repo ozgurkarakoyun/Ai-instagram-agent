@@ -1,1 +1,1 @@
-"""media package – template building, video processing, file utilities."""
+"""media package – template, video, utils, logo."""

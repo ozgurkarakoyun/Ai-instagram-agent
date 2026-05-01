@@ -1,0 +1,11 @@
+[phases.setup]
+aptPkgs = [
+  "fonts-dejavu-core",
+  "fonts-liberation",
+  "fonts-freefont-ttf",
+  "fontconfig",
+  "libcairo2",
+  "libcairo2-dev",
+  "python3-gi",
+  "libgirepository1.0-dev"
+]
