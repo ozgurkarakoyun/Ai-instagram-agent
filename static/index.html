@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Instagram Agent · Dr. Özgür Karakoyun</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #080c18;
+    --surface:  #0f1525;
+    --border:   #1e2a42;
+    --teal:     #00c9c8;
+    --teal-dim: #00797830;
+    --white:    #f0f4f8;
+    --muted:    #6b7ea0;
+    --danger:   #ff6b6b;
+    --success:  #00c9c8;
+    --radius:   14px;
+    --font-display: 'Syne', sans-serif;
+    --font-body:    'Inter', sans-serif;
+    --font-mono:    'DM Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    background: rgba(8,12,24,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .logo-pill {
+    background: var(--teal);
+    color: #080c18;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 15px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    letter-spacing: 1px;
+  }
+  header h1 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  header span {
+    font-size: 13px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    background: var(--teal);
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.3; }
+  }
+
+  /* ── Layout ── */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 40px;
+    display: grid;
+    grid-template-columns: 480px 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+
+  /* ── Form panel ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+  }
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 28px;
+    color: var(--white);
+  }
+  .panel-title span { color: var(--teal); }
+
+  .field { margin-bottom: 20px; }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  input[type=text], select, textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus, select:focus, textarea:focus {
+    border-color: var(--teal);
+  }
+  select option { background: #0f1525; }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--teal); background: var(--teal-dim); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 32px; margin-bottom: 8px; }
+  .upload-zone p { font-size: 13px; color: var(--muted); }
+  .upload-zone .filename { color: var(--teal); font-size: 13px; font-family: var(--font-mono); margin-top: 6px; }
+
+  /* ── Type toggle ── */
+  .toggle-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .toggle-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .toggle-btn.active {
+    border-color: var(--teal);
+    background: var(--teal-dim);
+    color: var(--teal);
+  }
+  .toggle-btn span { display: block; font-size: 20px; margin-bottom: 4px; }
+
+  /* ── Submit button ── */
+  .btn-generate {
+    width: 100%;
+    background: var(--teal);
+    color: #080c18;
+    border: none;
+    border-radius: 10px;
+    padding: 16px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-generate:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-generate:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-generate .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #080c18;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .btn-generate.loading .spinner { display: block; }
+  .btn-generate.loading .btn-text { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Result panel ── */
+  .result-panel {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .result-panel.visible { display: flex; }
+
+  .result-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .result-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 12px;
+  }
+
+  /* ── Hook badge ── */
+  .hook-text {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.3;
+  }
+
+  /* ── Caption ── */
+  .caption-box {
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--white);
+    white-space: pre-wrap;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  /* ── Hashtags ── */
+  .hashtag-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hashtag {
+    background: var(--teal-dim);
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+  }
+
+  /* ── Preview images ── */
+  .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .preview-item { position: relative; }
+  .preview-item img {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: block;
+  }
+  .preview-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(8,12,24,0.85);
+    border: 1px solid var(--border);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+  .preview-download {
+    display: block;
+    margin-top: 8px;
+    text-align: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    color: var(--teal);
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all .2s;
+  }
+  .preview-download:hover { border-color: var(--teal); }
+
+  /* ── Copy button ── */
+  .copy-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .btn-copy {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-copy:hover { border-color: var(--teal); color: var(--teal); }
+  .btn-copy.copied { border-color: var(--teal); color: var(--teal); }
+
+  /* ── Translation notice ── */
+  .translate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--teal-dim);
+    border: 1px solid var(--teal);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--teal);
+    margin-bottom: 12px;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+  }
+  .empty-state .big-icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
+  .empty-state p { font-size: 14px; max-width: 260px; line-height: 1.6; }
+
+  /* ── Error ── */
+  .error-box {
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 10px;
+    padding: 16px;
+    color: var(--danger);
+    font-size: 13px;
+    display: none;
+  }
+  .error-box.visible { display: block; }
+
+  /* ── Disclaimer ── */
+  .disclaimer {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .container { grid-template-columns: 1fr; padding: 24px 20px; }
+    header { padding: 16px 20px; }
+    header span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-pill">OK</div>
+  <h1>AI Instagram Agent</h1>
+  <span><span class="status-dot"></span>Assoc. Prof. Dr. Özgür Karakoyun</span>
+</header>
+
+<div class="container">
+
+  <!-- ── Form Panel ── -->
+  <div class="panel">
+    <div class="panel-title">Create <span>Content</span></div>
+
+    <div class="field">
+      <label>Upload Image or Video</label>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept="image/*,video/mp4,video/quicktime,.mov">
+        <div class="upload-icon">📎</div>
+        <p>Drop file here or click to browse</p>
+        <div class="filename" id="fileName"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Topic <span style="color:var(--teal);font-size:10px;text-transform:none;font-weight:400;">— Türkçe yazabilirsiniz, otomatik çevrilir</span></label>
+      <input type="text" id="topicInput" placeholder="e.g. Hip Replacement · Diz Protezi · Scoliosis" />
+    </div>
+
+    <div class="field">
+      <label>Content Type</label>
+      <div class="toggle-group">
+        <div class="toggle-btn active" data-type="image" onclick="setType('image')">
+          <span>🖼</span>Image Post + Story
+        </div>
+        <div class="toggle-btn" data-type="reel" onclick="setType('reel')">
+          <span>🎬</span>Reel Preview
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Tone</label>
+      <select id="toneSelect">
+        <option value="professional">Professional</option>
+        <option value="educational">Educational</option>
+        <option value="inspiring">Inspiring</option>
+      </select>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+
+    <button class="btn-generate" id="generateBtn" onclick="generate()">
+      <div class="spinner"></div>
+      <span class="btn-text">✦ Generate Content</span>
+    </button>
+
+    <div class="disclaimer" style="margin-top:20px;">
+      ⚕️ All content includes medical disclaimer automatically
+    </div>
+  </div>
+
+  <!-- ── Result Panel ── -->
+  <div>
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="big-icon">✦</div>
+      <p>Upload a photo or video, enter a topic, and generate your Instagram content.</p>
+    </div>
+
+    <!-- Results -->
+    <div class="result-panel" id="resultPanel">
+
+      <!-- Translation notice -->
+      <div class="translate-badge" id="translateBadge" style="display:none;">
+        🌐 Topic auto-translated to English
+      </div>
+
+      <!-- Hook -->
+      <div class="result-section">
+        <div class="result-label">Hook Line</div>
+        <div class="hook-text" id="hookText"></div>
+      </div>
+
+      <!-- Preview images -->
+      <div class="result-section" id="previewSection">
+        <div class="result-label">Preview</div>
+        <div class="preview-grid" id="previewGrid"></div>
+      </div>
+
+      <!-- Full caption -->
+      <div class="result-section">
+        <div class="result-label">Full Caption (paste-ready)</div>
+        <div class="caption-box" id="captionBox"></div>
+        <div class="copy-row">
+          <button class="btn-copy" onclick="copyCaption()">
+            <span>⎘</span> Copy Caption
+          </button>
+        </div>
+      </div>
+
+      <!-- Hashtags -->
+      <div class="result-section">
+        <div class="result-label">Hashtags</div>
+        <div class="hashtag-wrap" id="hashtagWrap"></div>
+      </div>
+
+      <!-- Reel script -->
+      <div class="result-section" id="scriptSection" style="display:none;">
+        <div class="result-label">Reel Script</div>
+        <div class="caption-box" id="scriptBox"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let selectedType = 'image';
+  let lastFullCaption = '';
+
+  // ── File upload ───────────────────────────────────────────────────────────
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+  const fileName = document.getElementById('fileName');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) {
+      fileName.textContent = '✓ ' + fileInput.files[0].name;
+    }
+  });
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag');
+    if (e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      fileName.textContent = '✓ ' + e.dataTransfer.files[0].name;
+    }
+  });
+
+  // ── Type toggle ───────────────────────────────────────────────────────────
+  function setType(type) {
+    selectedType = type;
+    document.querySelectorAll('.toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.type === type);
+    });
+  }
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  async function generate() {
+    const topic = document.getElementById('topicInput').value.trim();
+    const tone  = document.getElementById('toneSelect').value;
+    const file  = fileInput.files[0];
+
+    const errorBox = document.getElementById('errorBox');
+    errorBox.classList.remove('visible');
+
+    if (!file)  return showError('Please upload an image or video.');
+    if (!topic) return showError('Please enter a topic.');
+
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultPanel').classList.remove('visible');
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('topic', topic);
+    fd.append('content_type', selectedType);
+    fd.append('tone', tone);
+    fd.append('generate_story', 'true');
+    fd.append('auto_publish', 'false');
+
+    try {
+      const res = await fetch('/create-post', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.detail || 'Something went wrong.');
+        return;
+      }
+      renderResult(data);
+    } catch (e) {
+      showError('Network error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+
+  // ── Render result ─────────────────────────────────────────────────────────
+  function renderResult(data) {
+    // Translation badge
+    const badge = document.getElementById('translateBadge');
+    badge.style.display = data.topic_normalized ? 'inline-flex' : 'none';
+
+    // Hook
+    document.getElementById('hookText').textContent = data.hook || '';
+
+    // Caption
+    lastFullCaption = data.full_caption || '';
+    document.getElementById('captionBox').textContent = data.generated_caption || '';
+
+    // Hashtags
+    const hw = document.getElementById('hashtagWrap');
+    hw.innerHTML = '';
+    (data.generated_hashtags || []).forEach(tag => {
+      const span = document.createElement('span');
+      span.className = 'hashtag';
+      span.textContent = tag;
+      hw.appendChild(span);
+    });
+
+    // Preview images
+    const grid = document.getElementById('previewGrid');
+    grid.innerHTML = '';
+    const outputs = data.outputs || {};
+
+    const previews = [
+      { key: 'post',  label: 'Post' },
+      { key: 'story', label: 'Story' },
+      { key: 'reel',  label: 'Reel' },
+    ];
+    previews.forEach(({ key, label }) => {
+      if (!outputs[key]) return;
+      const url = outputs[key];
+      const isVideo = url.endsWith('.mp4');
+      const div = document.createElement('div');
+      div.className = 'preview-item';
+      if (isVideo) {
+        div.innerHTML = `
+          <div class="preview-badge">${label}</div>
+          <video src="${url}" controls style="width:100%;border-radius:10px;border:1px solid var(--border)"></video>
+          <a class="preview-download" href="${url}" download>⬇ Download ${label}</a>`;
+      } else {
+        div.innerHTML = `
+          <div class="preview-badge">${label}</div>
+          <img src="${url}" alt="${label}" loading="lazy">
+          <a class="preview-download" href="${url}" download>⬇ Download ${label}</a>`;
+      }
+      grid.appendChild(div);
+    });
+
+    // Reel script
+    const scriptSec = document.getElementById('scriptSection');
+    if (data.reel_script) {
+      scriptSec.style.display = 'block';
+      document.getElementById('scriptBox').textContent = data.reel_script;
+    } else {
+      scriptSec.style.display = 'none';
+    }
+
+    document.getElementById('resultPanel').classList.add('visible');
+    document.getElementById('resultPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Copy caption ──────────────────────────────────────────────────────────
+  function copyCaption() {
+    navigator.clipboard.writeText(lastFullCaption).then(() => {
+      const btn = document.querySelector('.btn-copy');
+      btn.classList.add('copied');
+      btn.innerHTML = '<span>✓</span> Copied!';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.innerHTML = '<span>⎘</span> Copy Caption';
+      }, 2000);
+    });
+  }
+
+  // ── Error helper ──────────────────────────────────────────────────────────
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = '⚠ ' + msg;
+    box.classList.add('visible');
+    document.getElementById('generateBtn').disabled = false;
+    document.getElementById('generateBtn').classList.remove('loading');
+  }
+
+  // ── Enter key submit ──────────────────────────────────────────────────────
+  document.getElementById('topicInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') generate();
+  });
+</script>
+
+</body>
+</html>
