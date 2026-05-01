@@ -16,6 +16,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 RUN mkdir -p uploads output static/fonts
-RUN chmod +x start.sh
 
-CMD ["sh", "start.sh"]
+CMD python -c "import os,subprocess; subprocess.run(['uvicorn','main:app','--host','0.0.0.0','--port',os.environ.get('PORT','8080')])"
