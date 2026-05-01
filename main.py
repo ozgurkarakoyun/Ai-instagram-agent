@@ -185,7 +185,8 @@ async def approve_publish(
     output_type: str = Form(default="post"),
 ):
     base_url = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-    file_path = f"output/{output_type}_{job_id}.jpg"
+    ext = "mp4" if output_type == "reel" else "jpg"
+    file_path = f"output/{output_type}_{job_id}.{ext}"
     public_url = f"{base_url}/{file_path}" if base_url else None
 
     return JSONResponse(content={

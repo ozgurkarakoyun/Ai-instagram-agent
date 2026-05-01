@@ -110,14 +110,22 @@ def _accent_line(draw, y, thickness=5):
 
 def _fit_into(img, bw, bh):
     """
-    Resmi header-footer arası alana TAMAMEN doldur — piksel boşluğu yok.
+    Görsel en-boy oranı KORUNARAK kutuya sığdırılır.
+    Kalan alan canvas gradient rengiyle doldurulur (letterbox).
+    Bozulma yok.
     """
-    img = img.convert("RGB").convert("RGBA")
-    resized = img.resize((bw, bh), Image.LANCZOS)
-    # Tüm pikseller opak olsun
-    r, g, b, a = resized.split()
-    a = a.point(lambda x: 255)
-    return Image.merge("RGBA", (r, g, b, a))
+    img = img.convert("RGB")
+    src_w, src_h = img.size
+    scale = min(bw / src_w, bh / src_h)
+    new_w = max(1, int(src_w * scale))
+    new_h = max(1, int(src_h * scale))
+    resized = img.resize((new_w, new_h), Image.LANCZOS)
+    # Canvas: lacivert (gradient başlangıç rengi)
+    canvas = Image.new("RGB", (bw, bh), (23, 68, 124))
+    x_off = (bw - new_w) // 2
+    y_off = (bh - new_h) // 2
+    canvas.paste(resized, (x_off, y_off))
+    return canvas
 
 def _logo_or_pill(canvas, draw, x, y, pill_h=108, logo_h=96):
     logo = load_logo(target_h=logo_h)
@@ -164,7 +172,7 @@ def build_image_post(input_path, output_path, topic, hook=""):
     try:
         user_img = Image.open(input_path).convert("RGBA")
         fitted   = _fit_into(user_img, W, IMG_H)
-        canvas.paste(fitted.convert('RGB'), (0,IMG_TOP))  # tam opak, maske yok
+        canvas.paste(fitted, (0, IMG_TOP))  # aspect ratio korunmuş RGB
     except Exception as exc:
         logger.error(f"Görsel: {exc}")
         canvas.paste(Image.new("RGBA",(W,IMG_H),(10,20,40,255)), (0,IMG_TOP))
@@ -246,19 +254,19 @@ def build_image_post(input_path, output_path, topic, hook=""):
 
     # Satır 2: Tel sol | Web sağ
     fy2 = fy_line + 14
-    draw.text((MARGIN, fy2), f"📞  {PHONE}", font=fdf, fill=(*WHITE,235))
-    web_t = f"🌐  {WEBSITE}"
+    draw.text((MARGIN, fy2), f"Tel:  {PHONE}", font=fdf, fill=(*WHITE,235))
+    web_t = f"Web:  {WEBSITE}"
     draw.text((W-MARGIN-_tw(draw,web_t,fdf), fy2),
               web_t, font=fdf, fill=(*LIGHT_BLUE,235))
 
     # Satır 3: Email ortada
     fy3 = fy2 + 48
-    em_t = f"✉   {EMAIL}"
+    em_t = f"E:    {EMAIL}"
     draw.text(((W-_tw(draw,em_t,fdf))//2, fy3),
               em_t, font=fdf, fill=(*SUBTEXT,210))
 
     # Disclaimer
-    dis = "⚕  Medical information only. Consult your doctor."
+    dis = "[!] Medical information only. Consult your doctor."
     draw.text(((W-_tw(draw,dis,disf))//2, H-32),
               dis, font=disf, fill=(100,140,180,185))
 
@@ -275,22 +283,27 @@ def build_story_post(input_path, output_path, topic, hook=""):
     canvas = Image.new("RGBA", (W,H), (*NAVY,255))
     _hgrad_canvas(canvas, NAVY, DARK)
 
-    # Görsel: header-footer arası tam dolu
-    STORY_HEADER_H = 170   # accent çizgi + logo alanı
-    STORY_FOOTER_H = 80    # website alanı
+    # Görsel: aspect ratio korunarak sığdır
+    STORY_HEADER_H = 170
+    STORY_FOOTER_H = 80
     IMG_ZONE_TOP   = STORY_HEADER_H
     IMG_ZONE_H     = H - STORY_HEADER_H - STORY_FOOTER_H
     try:
         user_img = Image.open(input_path).convert("RGB")
-        fitted   = user_img.resize((W, IMG_ZONE_H), Image.LANCZOS)
-        canvas.paste(fitted, (0, IMG_ZONE_TOP))
+        src_w, src_h = user_img.size
+        scale  = min(W / src_w, IMG_ZONE_H / src_h)
+        new_w  = max(1, int(src_w * scale))
+        new_h  = max(1, int(src_h * scale))
+        fitted = user_img.resize((new_w, new_h), Image.LANCZOS)
+        zone   = Image.new("RGB", (W, IMG_ZONE_H), (23, 68, 124))
+        zone.paste(fitted, ((W - new_w)//2, (IMG_ZONE_H - new_h)//2))
+        canvas.paste(zone, (0, IMG_ZONE_TOP))
     except Exception as exc:
         logger.warning(f"Story görsel: {exc}")
         canvas.paste(Image.new("RGB",(W,IMG_ZONE_H),(10,20,40)), (0,IMG_ZONE_TOP))
 
-    # Sadece üst ve alt metin okunabilirliği için hafif overlay
-    _vgrad(canvas, 0,               STORY_HEADER_H+40, (10,26,48,220), (0,0,0,0))
-    _vgrad(canvas, H-STORY_FOOTER_H-60, H,             (0,0,0,0),      (10,26,48,230))
+    _vgrad(canvas, 0,                   STORY_HEADER_H+40, (10,26,48,220), (0,0,0,0))
+    _vgrad(canvas, H-STORY_FOOTER_H-60, H,                 (0,0,0,0),      (10,26,48,230))
 
     # Sol/sağ kenar şeritler
     dec = Image.new("RGBA",(W,H),(0,0,0,0))
@@ -341,7 +354,7 @@ def build_story_post(input_path, output_path, topic, hook=""):
                       hl, font=hkf, fill=(0, 0, 0, 255))
 
     wf = _font(32)
-    wt = f"🌐  {WEBSITE}"
+    wt = f"Web:  {WEBSITE}"
     draw.text(((W-_tw(draw,wt,wf))//2, H-52), wt, font=wf, fill=(*LIGHT_BLUE,230))
 
     out = Path(output_path)

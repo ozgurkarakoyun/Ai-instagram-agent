@@ -120,7 +120,7 @@ def _render_header_footer() -> Image.Image:
         d.line([(xi, H-102), (xi, H-98)], fill=(r, g, b, 255))
 
     wf = _font(26)
-    wt = f"🌐  {WEBSITE}"
+    wt = f"Web:  {WEBSITE}"
     d.text(((W-_tw(d, wt, wf))//2, H-68), wt, font=wf, fill=(*LIGHT_BLUE, 230))
     return ov
 
@@ -323,7 +323,15 @@ def _process_image(input_path, output_path, topic, hook, script):
     from moviepy.editor import ImageClip
 
     logger.info(f"Resim → slideshow: {input_path}")
-    img = Image.open(input_path).convert("RGB").resize((W, H), Image.LANCZOS)
+    raw    = Image.open(input_path).convert("RGB")
+    src_w, src_h = raw.size
+    scale  = min(W / src_w, H / src_h)
+    new_w  = max(1, int(src_w * scale))
+    new_h  = max(1, int(src_h * scale))
+    resized = raw.resize((new_w, new_h), Image.LANCZOS)
+    # Lacivert arka plan üzerine ortala
+    img    = Image.new("RGB", (W, H), (23, 68, 124))
+    img.paste(resized, ((W - new_w)//2, (H - new_h)//2))
     arr = np.array(img)
 
     duration  = SLIDE_DURATION

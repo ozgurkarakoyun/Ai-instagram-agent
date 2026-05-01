@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 HOOK_TEMPLATES: dict[str, list[str]] = {
     "hip replacement": [
-        "Most hip replacement patients walk within 24 hours. Here's why.",
+        "Early mobilisation after hip replacement — what the evidence shows.",
         "3 signs you might need a hip replacement (that most people ignore)",
         "Your hip has been trying to tell you something for years.",
     ],
@@ -23,9 +23,9 @@ HOOK_TEMPLATES: dict[str, list[str]] = {
         "3 things surgeons wish patients knew before knee replacement.",
     ],
     "osseointegration": [
-        "No socket. No skin irritation. Just natural movement.",
-        "This implant connects directly to bone — and it's changing lives.",
-        "Why amputees are choosing osseointegration over traditional prosthetics.",
+        "Osseointegration may reduce socket-related discomfort in selected patients.",
+        "Osseointegration anchors a prosthetic to bone — a significant advance for eligible patients.",
+        "How osseointegration differs from traditional prosthetics.",
     ],
     "scoliosis": [
         "Caught early, scoliosis rarely needs surgery. Here's what to do.",
