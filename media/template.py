@@ -109,16 +109,25 @@ def _accent_line(draw, y, thickness=5):
         draw.line([(xi,y),(xi,y+thickness)], fill=(r,g,b,255))
 
 def _fit_into(img, bw, bh):
+    """
+    9:16 görsel için: resmin TAMAMI görünsün.
+    Önce tam sığdır (letterbox), üzerine hafif karartma yok.
+    Arka plan siyah yerine canvas gradient rengiyle dolar.
+    """
     img = img.convert("RGBA")
     sw, sh = img.size
-    bg = img.resize((bw,bh), Image.LANCZOS)
-    bg = bg.filter(ImageFilter.GaussianBlur(30))
-    bg = ImageEnhance.Brightness(bg.convert("RGB")).enhance(0.22).convert("RGBA")
-    bg = Image.alpha_composite(bg, Image.new("RGBA",(bw,bh),(0,0,0,100)))
-    scale = min(bw/sw, bh/sh)*0.88
-    nw, nh = max(1,int(sw*scale)), max(1,int(sh*scale))
-    fg = img.resize((nw,nh), Image.LANCZOS)
-    bg.paste(fg, ((bw-nw)//2,(bh-nh)//2), fg)
+
+    # Resmi kutuya TAM sığdır — hiç kırpmadan
+    scale = min(bw / sw, bh / sh)
+    nw = max(1, int(sw * scale))
+    nh = max(1, int(sh * scale))
+    fg = img.resize((nw, nh), Image.LANCZOS)
+
+    # Arka plan: şeffaf (canvas'ın kendi gradyanı görünsün)
+    bg = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    x_off = (bw - nw) // 2
+    y_off = (bh - nh) // 2
+    bg.paste(fg, (x_off, y_off), fg)
     return bg
 
 def _logo_or_pill(canvas, draw, x, y, pill_h=108, logo_h=96):
@@ -195,11 +204,11 @@ def build_image_post(input_path, output_path, topic, hook=""):
     draw.text((W-MARGIN-_tw(draw,spec,sf), 86), spec, font=sf, fill=(*LIGHT_BLUE,215))
 
     # ── Başlık + Hook ─────────────────────────────────────────────────────────
-    title_f = _font(130, bold=True)
-    hook_f  = _font(48)
+    title_f = _font(80, bold=True)
+    hook_f  = _font(42)
 
     t_lines  = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
-    LINE_H   = 142
+    LINE_H   = 92
     h_lines  = textwrap.fill(hook, width=38).split("\n")[:2] if hook else []
     HOOK_H   = 56
     SAFE_GAP = 95
@@ -293,10 +302,10 @@ def build_story_post(input_path, output_path, topic, hook=""):
     draw.text((next_x, 40), DOCTOR_NAME, font=_font(32), fill=(*WHITE,240))
 
     # Başlık + Hook
-    tf      = _font(130, bold=True)
-    hkf     = _font(50)
+    tf      = _font(80, bold=True)
+    hkf     = _font(42)
     t_lines = textwrap.fill(topic.upper(), width=14).split("\n")[:3]
-    LINE_H  = 142
+    LINE_H  = 92
     h_lines = textwrap.fill(hook, width=36).split("\n")[:2] if hook else []
     HOOK_H  = 58
 
