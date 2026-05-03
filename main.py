@@ -24,6 +24,7 @@ from ai.hashtags import generate_hashtags
 from ai.script import generate_script
 from ai.hook import generate_hook
 from ai.translate import normalize_topic
+from ai.image_edit import edit_uploaded_image
 from media.template import build_image_post, build_story_post
 from media.video import build_reel_preview
 from media.utils import validate_file, save_upload
@@ -97,6 +98,7 @@ async def create_post(
     content_type: str = Form(default="image"),
     tone: str = Form(default="professional"),
     generate_story: bool = Form(default=True),
+    ai_image_edit: bool = Form(default=True),
     auto_publish: bool = Form(default=False),
 ):
     rid = getattr(request.state, "request_id", uuid.uuid4().hex[:8])
@@ -131,19 +133,40 @@ async def create_post(
     full_caption = f"{caption}\n\n{hashtag_str}"
 
     outputs = {}
+    ai_sources = {}
     try:
+        source_for_post = str(upload_path)
+        source_for_story = str(upload_path)
+        source_for_reel = str(upload_path)
+
+        # Optional GPT Image editing layer. If it fails, the app continues with
+        # the original upload so the workflow does not break in production.
+        if ai_image_edit and upload_path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+            try:
+                if content_type == "image":
+                    source_for_post = edit_uploaded_image(str(upload_path), rid, topic, hook, "post")
+                    ai_sources["post"] = f"/{source_for_post}"
+                    if generate_story:
+                        source_for_story = edit_uploaded_image(str(upload_path), rid, topic, hook, "story")
+                        ai_sources["story"] = f"/{source_for_story}"
+                else:
+                    source_for_reel = edit_uploaded_image(str(upload_path), rid, topic, hook, "reel")
+                    ai_sources["reel"] = f"/{source_for_reel}"
+            except Exception as exc:
+                logger.warning(f"[{rid}] GPT image edit failed, using original upload: {exc}")
+
         if content_type == "image":
             post_path = f"output/post_{rid}.jpg"
-            build_image_post(str(upload_path), post_path, topic, hook)
+            build_image_post(source_for_post, post_path, topic, hook)
             outputs["post"] = f"/{post_path}"
 
             if generate_story:
                 story_path = f"output/story_{rid}.jpg"
-                build_story_post(str(upload_path), story_path, topic, hook)
+                build_story_post(source_for_story, story_path, topic, hook)
                 outputs["story"] = f"/{story_path}"
         else:
             reel_path   = f"output/reel_{rid}.mp4"
-            reel_result = build_reel_preview(str(upload_path), reel_path, topic, hook, script or "")
+            reel_result = build_reel_preview(source_for_reel, reel_path, topic, hook, script or "")
             actual_path    = reel_result.get("path", reel_path)
             is_fallback    = reel_result.get("fallback", False)
             outputs["reel"]          = f"/{actual_path}"
@@ -170,6 +193,8 @@ async def create_post(
         # ── Media files ───────────────────────────────────────────────────────
         "output_file_path": outputs.get("post") or outputs.get("reel"),   # primary file
         "outputs": outputs,                   # all files: {"post": ..., "story": ...}
+        "ai_edited_sources": ai_sources,       # GPT Image edited intermediate files, if used
+        "ai_image_edit_requested": ai_image_edit,
         # ── Status ───────────────────────────────────────────────────────────
         "preview_status": "ready",
         "publish_ready": False,

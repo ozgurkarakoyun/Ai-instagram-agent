@@ -50,16 +50,17 @@ def validate_file(file: UploadFile, content_type: str) -> None:
             f"content_type='image' but file extension is '{ext}'. "
             f"Upload a JPG, PNG, or WebP image."
         )
-    if content_type == "reel" and ext not in VIDEO_EXT:
+    # Reels can be generated from either a video or a still image slideshow.
+    if content_type == "reel" and ext not in (VIDEO_EXT | IMAGE_EXT):
         raise ValueError(
             f"content_type='reel' but file extension is '{ext}'. "
-            f"Upload an MP4 or MOV video."
+            f"Upload an MP4/MOV video or a JPG/PNG/WebP image."
         )
 
     # MIME type check (based on extension mapping)
     guessed_mime, _ = mimetypes.guess_type(file.filename)
     declared_mime   = (file.content_type or "").lower().split(";")[0].strip()
-    allowed_mime    = IMAGE_MIME if content_type == "image" else VIDEO_MIME
+    allowed_mime    = IMAGE_MIME if content_type == "image" else (VIDEO_MIME | IMAGE_MIME)
 
     for mime in (guessed_mime, declared_mime):
         if mime and mime not in allowed_mime:
